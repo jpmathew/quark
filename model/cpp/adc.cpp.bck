@@ -1,0 +1,234 @@
+#include "adc.h"
+#include "simpleFunctions.h"
+#include <iostream>
+using namespace std;
+
+
+adc::adc()
+{	
+	//error in lsbs
+	double errp[8]={-20.0,-18.4,13.1,-15.3,8.6,4.9,1.1,6.2};
+	double errm[8]={2.5,10.6,17.2,-7.0,9.1,2.8,5.4,4.5};
+	for(int iter=0;iter<8;iter++)
+	{
+		errp[iter]/=2048.0;
+		errm[iter]/=2048.0;
+	}
+	cdacP=new cdac(8,errp);
+	cdacM=new cdac(8,errm);
+}
+
+void adc::sample(double vinp,double vinm)
+{
+	cdacP->sample(vinp,refp,refm);
+	cdacM->sample(vinm,refp,refm);
+	for(int iter=0;iter<12;iter++)
+	{
+		add[iter]=0;
+		sub[iter]=0;
+	}
+}
+
+void adc::calibSample()
+{
+	cdacP->calibSample(refp,refm);
+	cdacM->calibSample(refp,refm);
+}
+
+int adc::convert()
+{
+	int iter;
+	double ainp,ainm;
+	int capPosition=0;
+	double vthresh=0.0;
+	int code=0;
+	for(iter=0;iter<11;iter++)
+	{
+		if(iter<5)
+		{
+			capPosition=iter;
+		}
+		else
+		{
+			capPosition=iter+1;
+		}
+		ainp=cdacP->changeBotPlateVoltage(add[iter]*refp+(1-add[iter])*refm,2*capPosition);
+		ainp=cdacP->changeBotPlateVoltage(sub[iter]*refm+(1-sub[iter])*refp,2*capPosition+1);
+		ainm=cdacM->changeBotPlateVoltage(add[iter]*refm+(1-add[iter])*refp,2*capPosition+1);
+		ainm=cdacM->changeBotPlateVoltage(sub[iter]*refp+(1-sub[iter])*refm,2*capPosition);
+	}
+	//bal cap
+	ainp=cdacP->changeBotPlateVoltage(refm,2*5);
+	ainp=cdacP->changeBotPlateVoltage(refp,2*5+1);
+	ainm=cdacM->changeBotPlateVoltage(refp,2*5+1);
+	ainm=cdacM->changeBotPlateVoltage(refm,2*5);
+
+	for(iter=0;iter<12;iter++)
+	{
+		vthresh=(refp-refm)/double(pow(2,iter+2));
+		//cout<<ainp<<"\t\t\t"<<ainm<<"\t\t\t"<<ainp-ainm<<endl;
+		if(ainp-ainm>vthresh)
+		{
+			sub[iter]=1;
+		}
+		else
+		{
+			sub[iter]=0;
+		}
+		if(ainp-ainm<-vthresh)
+		{
+			add[iter]=1;
+		}
+		else
+		{
+			add[iter]=0;
+		}
+
+		if(iter<5)
+		{
+			capPosition=iter;
+		}
+		else
+		{
+			capPosition=iter+1;
+		}
+		if(iter<10)
+		{
+			ainp=cdacP->changeBotPlateVoltage(add[iter]*refp+(1-add[iter])*refm,2*capPosition);
+			ainp=cdacP->changeBotPlateVoltage(sub[iter]*refm+(1-sub[iter])*refp,2*capPosition+1);
+			ainm=cdacM->changeBotPlateVoltage(add[iter]*refm+(1-add[iter])*refp,2*capPosition+1);
+			ainm=cdacM->changeBotPlateVoltage(sub[iter]*refp+(1-sub[iter])*refm,2*capPosition);
+		}
+		else if(iter==10)
+		{
+			ainp=cdacP->changeBotPlateVoltage(add[iter]*refp+(1-add[iter])*refm,2*capPosition);
+			ainp=cdacP->changeBotPlateVoltage(sub[iter]*refm+(1-sub[iter])*refp,2*capPosition+1);
+			ainm=cdacM->getTopPlateVoltage();
+		}
+	}
+
+	for(iter=0;iter<12;iter++)
+	{
+		code+=pow(2,12-iter-1)*(add[iter]-sub[iter]);
+	}
+	code+=pow(2,12);
+	code/=2;
+	return code;
+}
+
+int adc::calibConvert(int numForcedBits,int* forceAdd,int* forceSub,int* forceBal)
+{
+	int iter;
+	double ainp,ainm;
+	int capPosition=0;
+	double vthresh=0.0;
+	int code=0;
+
+	for(iter=0;iter<numForcedBits;iter++)
+	{
+		add[iter]=forceAdd[iter];
+		sub[iter]=forceSub[iter];
+	}
+	for(iter=0;iter<11;iter++)
+	{
+		if(iter<5)
+		{
+			capPosition=iter;
+		}
+		else
+		{
+			capPosition=iter+1;
+		}
+		ainp=cdacP->changeBotPlateVoltage(add[iter]*refp+(1-add[iter])*refm,2*capPosition);
+		ainp=cdacP->changeBotPlateVoltage(sub[iter]*refm+(1-sub[iter])*refp,2*capPosition+1);
+		ainm=cdacM->changeBotPlateVoltage(add[iter]*refm+(1-add[iter])*refp,2*capPosition+1);
+		ainm=cdacM->changeBotPlateVoltage(sub[iter]*refp+(1-sub[iter])*refm,2*capPosition);
+		//cout<<ainp<<"\t\t\t"<<ainm<<"\t\t\t"<<ainp-ainm<<endl;
+	}
+	//bal cap
+	ainp=cdacP->changeBotPlateVoltage(forceBal[0]*refp+(1-forceBal[0])*refm,2*5);
+	ainp=cdacP->changeBotPlateVoltage(forceBal[1]*refm+(1-forceBal[1])*refp,2*5+1);
+	ainm=cdacM->changeBotPlateVoltage(forceBal[0]*refm+(1-forceBal[0])*refp,2*5+1);
+	ainm=cdacM->changeBotPlateVoltage(forceBal[1]*refp+(1-forceBal[1])*refm,2*5);
+	
+	for(iter=numForcedBits;iter<12;iter++)
+	{
+		vthresh=(refp-refm)/double(pow(2,iter+2));
+		//cout<<ainp<<"\t\t\t"<<ainm<<"\t\t\t"<<ainp-ainm<<endl;
+		if(ainp-ainm>vthresh)
+		{
+			sub[iter]=1;
+		}
+		else
+		{
+			sub[iter]=0;
+		}
+		if(ainp-ainm<-vthresh)
+		{
+			add[iter]=1;
+		}
+		else
+		{
+			add[iter]=0;
+		}
+
+		if(iter<5)
+		{
+			capPosition=iter;
+		}
+		else
+		{
+			capPosition=iter+1;
+		}
+		if(iter<10)
+		{
+			ainp=cdacP->changeBotPlateVoltage(add[iter]*refp+(1-add[iter])*refm,2*capPosition);
+			ainp=cdacP->changeBotPlateVoltage(sub[iter]*refm+(1-sub[iter])*refp,2*capPosition+1);
+			ainm=cdacM->changeBotPlateVoltage(add[iter]*refm+(1-add[iter])*refp,2*capPosition+1);
+			ainm=cdacM->changeBotPlateVoltage(sub[iter]*refp+(1-sub[iter])*refm,2*capPosition);
+		}
+		else if(iter==10)
+		{
+			ainp=cdacP->changeBotPlateVoltage(add[iter]*refp+(1-add[iter])*refm,2*capPosition);
+			ainp=cdacP->changeBotPlateVoltage(sub[iter]*refm+(1-sub[iter])*refp,2*capPosition+1);
+			ainm=cdacM->getTopPlateVoltage();
+		}
+	}
+
+	for(iter=0;iter<12;iter++)
+	{
+		code+=pow(2,12-iter-1)*(add[iter]-sub[iter]);
+	}
+	code+=pow(2,7)*(forceBal[0]-forceBal[1]);
+	code+=pow(2,12);
+	code/=2;
+	return code;
+}
+
+double adc::residue(int bitPos)
+{
+	double residue=0.0;
+	for(int iter=bitPos+1;iter<12;iter++)
+	{
+		residue+=(add[iter]-sub[iter])*(refp-refm)/double(pow(2,iter+1));
+	}
+	return residue;
+}
+
+void adc::capCalib()
+{
+
+
+
+adc::~adc()
+{
+	delete cdacP;
+	delete cdacM;
+}
+		
+
+
+
+
+
+
