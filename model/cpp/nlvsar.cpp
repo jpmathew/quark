@@ -22,7 +22,7 @@ nlvsar::nlvsar(double refp,double refm)
 	numLoops=new int[3];
 	add=new int[16];
 	sub=new int[16];
-	bitWeight=new int[15];
+	bitWeight=new int[16];
 	residue=new double[3];
 	voff[0]=4.0*(refp-refm)/double(pow(2,5));
 	startPos[0]=5;
@@ -32,7 +32,7 @@ nlvsar::nlvsar(double refp,double refm)
 	startPos[1]=8;
 	numBits[1]=3;
 	numLoops[1]=1;
-	voff[2]=6.0*(refp-refm)/double(pow(2,9));
+	voff[2]=10.0*(refp-refm)/double(pow(2,9));
 	startPos[2]=11;
 	numBits[2]=4;
 	numLoops[2]=4;
@@ -51,7 +51,10 @@ nlvsar::nlvsar(double refp,double refm)
 	bitWeight[12]=pow(2,2);
 	bitWeight[13]=pow(2,1);
 	bitWeight[14]=pow(2,0);
-	est=0;
+	bitWeight[15]=pow(2,1);
+	voffCor=0.0;
+	enGEst=0;
+	enGCor=0;
 }
 
 nlvsar::~nlvsar()
@@ -81,13 +84,7 @@ void nlvsar::sample(double vinp,double vinm)
 	}
 }
 
-void nlvsar::rstEst()
-{
-	est=0.0;
-	iEst=0;
-}
-
-int nlvsar::convert(int dith)
+int nlvsar::convert()
 {
 	double ainp,ainm;
 	double tVcoP,tVcoM;
@@ -102,25 +99,26 @@ int nlvsar::convert(int dith)
 		ainm=cdacM->changeBotPlateVoltage(add[pos]*refm+(1-add[pos])*refp,2*pos+1);
 		ainm=cdacM->changeBotPlateVoltage(sub[pos]*refp+(1-sub[pos])*refm,2*pos);
 	}
-	//cout<<ainp<<"\t"<<ainm<<endl;
-	//cout<<"-----------------------------------"<<endl;
 	code=0;
-	code16=0;
-	th=0;
-	double dadd;
-	dither=(rand()%129-dith)*(refp-refm)/double(pow(2,17)); 
+	int calPol;
+	calPol=rand()%2;
+	add[15]=calPol;
+	sub[15]=1-calPol;
+	sgn=add[15]-sub[15];
+	iEst=0;
+	double corr;
 	for(iter=0;iter<3;iter++)
 	{
-		if(iter==1)
+		if(iter==2)
 		{
-			dadd=1.0*dither;//+4.0/double(pow(2,12))*(refp-refm);
+			corr=enGCor*voffCor;
 		}
 		else
 		{
-			dadd=0.0;
+			corr=0.0;
 		}
-		tVcoP=vcoP->getKEdge(numLoops[iter],cdacP->getTopPlateVoltage()-cdacM->getTopPlateVoltage()+voff[iter]+dadd);
-		tVcoM=vcoM->getKEdge(numLoops[iter],cdacP->getTopPlateVoltage()-cdacM->getTopPlateVoltage()-voff[iter]+dadd);
+		tVcoP=vcoP->getKEdge(numLoops[iter],cdacP->getTopPlateVoltage()-cdacM->getTopPlateVoltage()+voff[iter]+corr);
+		tVcoM=vcoM->getKEdge(numLoops[iter],cdacP->getTopPlateVoltage()-cdacM->getTopPlateVoltage()-voff[iter]-corr);
 		rring->resolveTime(tVcoP-tVcoM,add+startPos[iter],sub+startPos[iter],numBits[iter]);
 		for(count=0;count<numBits[iter];count++)
 		{
@@ -130,43 +128,27 @@ int nlvsar::convert(int dith)
 			ainm=cdacM->changeBotPlateVoltage(add[pos]*refm+(1-add[pos])*refp,2*pos+1);
 			ainm=cdacM->changeBotPlateVoltage(sub[pos]*refp+(1-sub[pos])*refm,2*pos);
 			code+=(add[pos]-sub[pos])*bitWeight[pos];
-			//cout<<add[pos]<<"\t"<<sub[pos]<<endl;
-			if(iter==1)
-			{
-				code16+=(add[pos]-sub[pos])*bitWeight[pos]*2;
-			}
-			else if(iter==2)
-			{
-				code16+=(add[pos]-sub[pos])*bitWeight[pos];
-			}
+			residue[iter]=ainp-ainm;
+			if(iter==2)
+			iEst+=(add[pos]-sub[pos])*bitWeight[pos];
 
-
-			if(iter==1)
-			{
-				th+=(add[pos])*pow(2,2-count);
-			}
 		}
-		//cout<<"-----------------------------------"<<endl;
-		//cout<<code<<"\t"<<ainp<<"\t"<<ainm<<endl;
-		residue[iter]=ainp-ainm;
+		if(iter==1 && enGEst==1)
+		{
+			pos=15;
+			ainp=cdacP->changeBotPlateVoltage(add[pos]*refp+(1-add[pos])*refm,2*pos);
+			ainp=cdacP->changeBotPlateVoltage(sub[pos]*refm+(1-sub[pos])*refp,2*pos+1);
+			ainm=cdacM->changeBotPlateVoltage(add[pos]*refm+(1-add[pos])*refp,2*pos+1);
+			ainm=cdacM->changeBotPlateVoltage(sub[pos]*refp+(1-sub[pos])*refm,2*pos);
+			code+=(add[pos]-sub[pos])*bitWeight[pos];
+		}
+		if(iter==2 && enGEst==1)
+		{
+			iEst=iEst*(add[15]-sub[15]);
+			//est=(pow(2,16)*est-1*est+1*iEst)/double(pow(2,16));
+			voffCor=voffCor-1e-7*(iEst+2);
+		}
 	}
-	if(th>2)
-	{
-		sgn=1;
-	}
-	else
-	{
-		sgn=0;
-	}
-	//code+=2048;
-	//est+=.002*(sign(code16-est)-sgn)*(abs((code16-est))+1);
-	//double tmp=.001*(sign(code16-est)-sgn);//(code16-est);
-	//iEst+=(sign(code16-iEst)-sgn);
-	//est=0.9999*est+.0001*iEst;
-	//cout<<code16<<"\t"<<iEst<<"\t"<<sgn<<endl;
-	//cout<<"-----------------------------------"<<endl;
-	//printf("%1.6f\t%1.6f",residue[0],residue[1]);
-	//cout<<"\t"<<code16<<"\t"<<est<<"\t"<<add[9]<<endl;
 	return code;
 }
 
@@ -175,24 +157,17 @@ double nlvsar::getResidue(int stage)
 	return residue[stage];
 }
 
-double nlvsar::getEst()
+double nlvsar::getOffCorr()
 { 
-	return est;
+	return voffCor;
 }
+
 
 int nlvsar::getIEst()
 { 
 	return iEst;
 }
 
-double nlvsar::getDither()
-{ 
-	return dither;
-}
-int nlvsar::getCode()
-{
-	return code16;
-}
 
 
 int nlvsar::getAdd(int pos)
@@ -200,12 +175,27 @@ int nlvsar::getAdd(int pos)
 	return add[pos];
 }
 
-int nlvsar::getTh()
-{
-	return th;
-}
-
 int nlvsar::getSgn()
 {
 	return sgn;
 }
+
+void nlvsar::setGCor(int val)
+{
+	enGCor=val;
+	if(val==0)
+	{
+		setGEst(0);
+	}
+}
+
+void nlvsar::setGEst(int val)
+{
+	enGEst=val;
+	if(val==1)
+	{
+		setGCor(1);
+	}
+}
+
+

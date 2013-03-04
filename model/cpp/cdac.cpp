@@ -38,8 +38,8 @@ cdac::cdac()
 	capWeight[27]= 1.0/double(pow(2,12));
 	capWeight[28]= 1.0/double(pow(2,13)); //12
 	capWeight[29]= 1.0/double(pow(2,13));
-	capWeight[30]= 1.0/double(pow(2,14)); //13
-	capWeight[31]= 1.0/double(pow(2,14));
+	capWeight[30]= 1.0/double(pow(2,12)); //13
+	capWeight[31]= 1.0/double(pow(2,12));
 	//bottompaltes
 	totSamplingCap=0;
 	capVoltage=new double[capCount];

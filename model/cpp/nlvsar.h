@@ -24,25 +24,23 @@ class nlvsar
 		int code;
 		int *bitWeight;
 		double *residue;
-		double est;
 		int iEst;
-		int code16;
-		int th;
 		int sgn;
-		double dither;
+		double voffCor;
+		int enGCor;
+		int enGEst;
 	public:
 	nlvsar(double refp,double refm);
 	void sample(double vinp,double vinm);
-	int convert(int dith);
+	int convert();
 	double getResidue(int stage);
-	double getEst();
-	void rstEst();
 	int getIEst();
+	double getOffCorr();
 	int getCode();
-	int getTh();
 	int getSgn();
-	double getDither();
 	int getAdd(int pos);
+	void setGCor(int val);
+	void setGEst(int val);
 	~nlvsar();
 };
 #endif

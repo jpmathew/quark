@@ -34,6 +34,10 @@ int main()
 			//printf("%1.6f\t",input);
 			code=adc->convert();	
 			dataOut<<(int(code+1))/2+64<<endl;
+			resaOut<<input<<endl;
+			resbOut<<adc->getResidue(0)<<endl;
+			rescOut<<adc->getOffCorr()<<endl;
+			reseOut<<adc->getSgn()<<endl;
 		}
 		adc->setGEst(1);
 		for(int count=0;count<1000000;count++)
@@ -41,14 +45,22 @@ int main()
 			input=0.9/pow(2,6)*sin(2*3.14/997.0*count);
 			adc->sample(0.45+input/2,0.45-input/2);
 			code=adc->convert();	
-			data1Out<<(int(code+1))/2+64<<endl;
-			resaOut<<adc->getOffCorr()<<endl;
+			data1Out<<code<<endl;
+			resaOut<<input<<endl;
+			resbOut<<adc->getIEst()<<endl;
+			rescOut<<adc->getOffCorr()<<endl;
+			reseOut<<adc->getSgn()<<endl;
 		}
 		for(input=-1.0*0.9/pow(2,6);input<1.0*0.9/pow(2,6);input+=0.000001)
 		{
 			adc->sample(0.45+input/2,0.45-input/2);
+			//printf("%1.6f\t",input);
 			code=adc->convert();	
 			data2Out<<(int(code+1))/2+64<<endl;
+			resaOut<<input<<endl;
+			resbOut<<adc->getResidue(0)<<endl;
+			rescOut<<adc->getOffCorr()<<endl;
+			reseOut<<adc->getSgn()<<endl;
 		}
 
 		linTest->computeLin("data.dat","1");
