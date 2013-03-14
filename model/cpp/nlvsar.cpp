@@ -15,7 +15,10 @@ nlvsar::nlvsar(double refp,double refm)
 	cdacM=new cdac();
 	vcoP=new nlvco();
 	vcoM=new nlvco();
-	rring=new vernierRing(10,8);
+	//rring=new vernierRing(10,8,16);
+	rring=new vernierRing(16);
+	tCorrP=new double[8];
+	tCorrM=new double[8];
 	voff=new double[3];
 	numBits=new int[3];
 	startPos=new int[3];
@@ -32,7 +35,7 @@ nlvsar::nlvsar(double refp,double refm)
 	startPos[1]=8;
 	numBits[1]=3;
 	numLoops[1]=1;
-	voff[2]=10.0*(refp-refm)/double(pow(2,9));
+	voff[2]=8.0*(refp-refm)/double(pow(2,9));
 	startPos[2]=11;
 	numBits[2]=4;
 	numLoops[2]=4;
@@ -54,7 +57,13 @@ nlvsar::nlvsar(double refp,double refm)
 	bitWeight[15]=pow(2,1);
 	voffCor=0.0;
 	enGEst=0;
+	est=0;
 	enGCor=0;
+	for(int dcount=0;dcount<8;dcount++)
+	{
+		tCorrP[dcount]=0.0;
+		tCorrM[dcount]=0.0;
+	}
 }
 
 nlvsar::~nlvsar()
@@ -130,7 +139,9 @@ int nlvsar::convert()
 			code+=(add[pos]-sub[pos])*bitWeight[pos];
 			residue[iter]=ainp-ainm;
 			if(iter==2)
-			iEst+=(add[pos]-sub[pos])*bitWeight[pos];
+			{
+				iEst+=(add[pos]-sub[pos])*bitWeight[pos];
+			}
 
 		}
 		if(iter==1 && enGEst==1)
@@ -144,9 +155,21 @@ int nlvsar::convert()
 		}
 		if(iter==2 && enGEst==1)
 		{
-			iEst=iEst*(add[15]-sub[15]);
-			//est=(pow(2,16)*est-1*est+1*iEst)/double(pow(2,16));
-			voffCor=voffCor-1e-7*(iEst+2);
+			for(int dcount=0;dcount<1;dcount++)
+			{
+				if(iEst==2*dcount+1 || iEst==2*dcount+3)
+				{
+					tCorrP[dcount]=tCorrP[dcount]+1e-4*(iEst-2*dcount-2);
+					rring->setCorr(tCorrP[dcount],0,dcount);	
+				}
+			/*	if(iEst==-2*dcount-1 || iEst==-2*dcount-3)
+				{
+					tCorrM[dcount]=tCorrM[dcount]-1e-4*(iEst+2*dcount-2);
+					rring->setCorr(tCorrM[dcount],1,dcount);	
+				}*/
+			}
+			//iEst=iEst*(add[15]-sub[15]);
+			//voffCor=voffCor-1e-7*(iEst+2);
 		}
 	}
 	return code;
@@ -167,7 +190,15 @@ int nlvsar::getIEst()
 { 
 	return iEst;
 }
+double  nlvsar::getest()
+{ 
+	return est;
+}
+double nlvsar::getCorr(int pm,int count)
+{
+	return rring->getCorr(pm,count);
 
+}
 
 
 int nlvsar::getAdd(int pos)

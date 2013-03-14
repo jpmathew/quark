@@ -10,7 +10,7 @@ using namespace std;
 
 int main()
 {
-	srand(time(NULL));
+	//srand(time(NULL));
 	ofstream dataOut("data.dat",ios::out);
 	ofstream data1Out("data1.dat",ios::out);
 	ofstream data2Out("data2.dat",ios::out);
@@ -36,13 +36,16 @@ int main()
 			dataOut<<(int(code+1))/2+64<<endl;
 		}
 		adc->setGEst(1);
-		for(int count=0;count<1000000;count++)
+		for(int count=0;count<300000;count++)
 		{
 			input=0.9/pow(2,6)*sin(2*3.14/997.0*count);
 			adc->sample(0.45+input/2,0.45-input/2);
 			code=adc->convert();	
 			data1Out<<(int(code+1))/2+64<<endl;
 			resaOut<<adc->getOffCorr()<<endl;
+			resbOut<<adc->getCorr(0,0)<<endl;
+			rescOut<<adc->getCorr(0,1)<<endl;
+			resdOut<<adc->getCorr(0,2)<<endl;
 		}
 		for(input=-1.0*0.9/pow(2,6);input<1.0*0.9/pow(2,6);input+=0.000001)
 		{
@@ -50,6 +53,7 @@ int main()
 			code=adc->convert();	
 			data2Out<<(int(code+1))/2+64<<endl;
 		}
+		
 
 		linTest->computeLin("data.dat","1");
 		linTest->computeLin("data2.dat","2");
@@ -57,6 +61,7 @@ int main()
 	}
 	else if(rampTest==2)
 	{
+		adc->setGEst(1);
 		for(int count=0;count<1000000;count++)
 		{
 			input=0.9/pow(2,6)*sin(2*3.14/997.0*count);
@@ -66,7 +71,7 @@ int main()
 			resaOut<<input<<endl;
 			resbOut<<adc->getIEst()<<endl;
 			rescOut<<adc->getOffCorr()<<endl;
-			reseOut<<adc->getSgn()<<endl;
+			reseOut<<adc->getCorr(0,0)<<endl;
 		}
 	}
 	else

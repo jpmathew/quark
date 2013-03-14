@@ -29,6 +29,9 @@ class nlvsar
 		double voffCor;
 		int enGCor;
 		int enGEst;
+		double *tCorrP;
+		double *tCorrM;
+		double est;
 	public:
 	nlvsar(double refp,double refm);
 	void sample(double vinp,double vinm);
@@ -41,6 +44,8 @@ class nlvsar
 	int getAdd(int pos);
 	void setGCor(int val);
 	void setGEst(int val);
+	double getCorr(int pm,int count);
+	double getest();
 	~nlvsar();
 };
 #endif
